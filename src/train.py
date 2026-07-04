@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
-from sklearn.metrics import roc_auc_score, f1_score, precision_recall_fscore_support
+from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 from data_preprocessing import get_financial_dataset
 from model import FinancialGraphSAGE
 
 def calculate_metrics(logits, targets, mask):
-    """Computes specific optimization KPIs handling high class imbalance."""
     probs = torch.softmax(logits[mask], dim=1)[:, 1].detach().cpu().numpy()
     preds = logits[mask].argmax(dim=1).detach().cpu().numpy()
     actual = targets[mask].cpu().numpy()
@@ -18,7 +17,6 @@ def train_pipeline():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     data = get_financial_dataset().to(device)
     
-    # Calculate negative-to-positive ratio to mitigate extreme class imbalance
     num_neg = sorted(torch.bincount(data.y).tolist())[0]
     num_pos = sorted(torch.bincount(data.y).tolist())[1]
     pos_weight = torch.tensor([num_pos / num_neg]).to(device)
@@ -43,7 +41,6 @@ def train_pipeline():
                 val_prec, val_rec, val_f1, val_auc = calculate_metrics(val_out, data.y, data.val_mask)
                 print(f"Epoch {epoch:03d} | Loss: {loss.item():.4f} | Val F1: {val_f1:.4f} | Val AUC-ROC: {val_auc:.4f}")
                 
-    # Final Evaluation Check
     model.eval()
     with torch.no_grad():
         final_out = model(data.x, data.edge_index)
