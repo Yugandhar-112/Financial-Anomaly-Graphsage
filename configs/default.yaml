@@ -1,0 +1,38 @@
+# Default training configuration.
+# Override individual values from the CLI, e.g.:
+#   python src/train.py --model_type gat
+#   python src/train.py --synthetic
+# For deeper overrides, copy this file (e.g. configs/gat_deep.yaml) and pass
+# it via --config.
+
+seed: 42
+
+data:
+  synthetic: false          # true -> use synthetic demo graph, no CSVs needed
+  data_dir: "data/raw/elliptic"
+  train_max_step: 29        # time_step <= 29           -> train
+  val_max_step: 34          # 29 < time_step <= 34      -> validation
+                             # time_step > 34             -> test
+
+model:
+  type: "graphsage"          # graphsage | gat | mlp
+  hidden_channels: 64
+  out_channels: 2
+  num_layers: 2
+  dropout: 0.3
+  aggr: "mean"               # used only when type == graphsage
+  heads: 4                   # used only when type == gat
+
+training:
+  epochs: 150
+  lr: 0.005
+  weight_decay: 0.001
+  focal_alpha: 0.75
+  focal_gamma: 2.0
+  eval_every: 15
+  threshold_search_max: 0.5  # cap threshold search to prioritize recall
+
+mlflow:
+  experiment_name: "financial-anomaly-graphsage"
+  tracking_uri: "mlruns"     # local folder; view with `mlflow ui`
+  run_name: null             # auto-generated from model type + seed if null

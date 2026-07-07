@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/financial-anomaly-graphsage/mlruns/283373206064920500/d865fe102d79478e8cd48532a27ef205/artifacts
+end_time: 1783406906746
+entry_point_name: ''
+experiment_id: '283373206064920500'
+lifecycle_stage: active
+run_id: d865fe102d79478e8cd48532a27ef205
+run_name: mlp_seed42
+run_uuid: d865fe102d79478e8cd48532a27ef205
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1783406894073
+status: 3
+tags: []
+user_id: 83raj
