@@ -22,6 +22,7 @@ shuffle, which would leak future graph structure into training.
 import os
 from dataclasses import dataclass
 
+import joblib
 import numpy as np
 import pandas as pd
 import torch
@@ -37,6 +38,8 @@ EDGELIST_FILE = "elliptic_txs_edgelist.csv"
 DEFAULT_TRAIN_MAX_STEP = 29   # time_step <= 29           -> train
 DEFAULT_VAL_MAX_STEP = 34     # 29 < time_step <= 34      -> validation
 # time_step > 34                                          -> test
+
+DEFAULT_SCALER_PATH = "checkpoints/feature_scaler.joblib"
 
 
 @dataclass
@@ -68,33 +71,20 @@ def _check_files_exist(data_dir: str):
         )
 
 
-def load_elliptic(
-    data_dir: str = "data/raw/elliptic",
-    train_max_step: int = DEFAULT_TRAIN_MAX_STEP,
-    val_max_step: int = DEFAULT_VAL_MAX_STEP,
-    make_undirected: bool = True,
-) -> tuple:
+def _read_merged_table(data_dir: str) -> pd.DataFrame:
     """
-    Loads the Elliptic dataset and builds a PyG Data object with time-based
-    train/val/test masks over the labeled subset of nodes.
-
-    Returns:
-        data: torch_geometric.data.Data with x, y, edge_index, and
-              train_mask / val_mask / test_mask (bool tensors over ALL nodes;
-              unknown-labeled nodes are False in every mask but still
-              participate in message passing).
-        stats: EllipticStats summary for logging/README numbers.
+    Shared parsing logic: reads features + classes and merges them into one
+    table indexed in txId order (this order defines node indices everywhere
+    downstream, including edge_index and the sample-subgraph generator).
     """
     _check_files_exist(data_dir)
 
-    # --- features (no header) ---
     feat_path = os.path.join(data_dir, FEATURES_FILE)
     features_df = pd.read_csv(feat_path, header=None)
     n_cols = features_df.shape[1]
     col_names = ["txId", "time_step"] + [f"feat_{i}" for i in range(n_cols - 2)]
     features_df.columns = col_names
 
-    # --- classes ---
     classes_path = os.path.join(data_dir, CLASSES_FILE)
     classes_df = pd.read_csv(classes_path)
     classes_df["txId"] = classes_df["txId"].astype(features_df["txId"].dtype)
@@ -106,8 +96,52 @@ def load_elliptic(
 
     merged = features_df.merge(classes_df[["txId", "label"]], on="txId", how="left")
     merged["label"] = merged["label"].fillna(-1).astype(int)
+    return merged
 
-    # --- contiguous node index mapping ---
+
+def get_raw_node_table(data_dir: str = "data/raw/elliptic"):
+    """
+    Public helper (used by src/generate_sample_subgraph.py) exposing the
+    RAW, unscaled feature table + id<->index mapping, so any consumer that
+    needs raw feature vectors uses the exact same parsing/ordering logic as
+    load_elliptic() itself -- avoids two copies of this logic drifting apart.
+
+    Returns: (merged_df, feature_cols, id_to_idx, idx_to_id)
+    """
+    merged = _read_merged_table(data_dir)
+    feature_cols = [c for c in merged.columns if c.startswith("feat_")]
+    tx_ids = merged["txId"].values
+    id_to_idx = {tx: i for i, tx in enumerate(tx_ids)}
+    idx_to_id = {i: tx for tx, i in id_to_idx.items()}
+    return merged, feature_cols, id_to_idx, idx_to_id
+
+
+def load_elliptic(
+    data_dir: str = "data/raw/elliptic",
+    train_max_step: int = DEFAULT_TRAIN_MAX_STEP,
+    val_max_step: int = DEFAULT_VAL_MAX_STEP,
+    make_undirected: bool = True,
+    save_scaler_path: str = DEFAULT_SCALER_PATH,
+) -> tuple:
+    """
+    Loads the Elliptic dataset and builds a PyG Data object with time-based
+    train/val/test masks over the labeled subset of nodes.
+
+    As a side effect, persists the fitted StandardScaler to `save_scaler_path`
+    (default checkpoints/feature_scaler.joblib) -- the FastAPI inference
+    service loads this to scale incoming raw feature vectors identically to
+    how training data was scaled. Pass save_scaler_path=None to skip saving
+    (e.g. in tests).
+
+    Returns:
+        data: torch_geometric.data.Data with x, y, edge_index, and
+              train_mask / val_mask / test_mask (bool tensors over ALL nodes;
+              unknown-labeled nodes are False in every mask but still
+              participate in message passing).
+        stats: EllipticStats summary for logging/README numbers.
+    """
+    merged = _read_merged_table(data_dir)
+
     tx_ids = merged["txId"].values
     id_to_idx = {tx: i for i, tx in enumerate(tx_ids)}
     num_nodes = len(tx_ids)
@@ -143,6 +177,10 @@ def load_elliptic(
     scaler = StandardScaler()
     scaler.fit(raw_x[train_mask_np])
     x_np = scaler.transform(raw_x)
+
+    if save_scaler_path:
+        os.makedirs(os.path.dirname(save_scaler_path) or ".", exist_ok=True)
+        joblib.dump(scaler, save_scaler_path)
 
     x = torch.tensor(x_np, dtype=torch.float)
     y = torch.tensor(y_np, dtype=torch.long)
