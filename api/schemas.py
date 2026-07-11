@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NodeInput(BaseModel):
@@ -17,6 +17,8 @@ class EdgeInput(BaseModel):
 
 
 class SubgraphRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     nodes: List[NodeInput]
     edges: List[EdgeInput] = []
     model_type: Optional[str] = Field(
@@ -36,6 +38,8 @@ class PredictionResult(BaseModel):
 
 
 class SubgraphResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     predictions: List[PredictionResult]
     threshold: float
     model_type: str
