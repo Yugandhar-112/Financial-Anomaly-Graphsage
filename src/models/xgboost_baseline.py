@@ -9,6 +9,8 @@ numbers are directly comparable in the README's baseline-vs-GNN table.
 """
 
 import argparse
+import json
+import os
 import sys
 
 import numpy as np
@@ -72,6 +74,12 @@ def run_xgboost_baseline(data_dir: str = "data/raw/elliptic", synthetic: bool = 
     print(f"Recall:             {metrics['recall']:.4f}")
     print(f"F1-Score:           {metrics['f1']:.4f}")
     print(f"AUC-ROC:            {metrics['auc']:.4f}")
+
+    os.makedirs("checkpoints", exist_ok=True)
+    model.save_model("checkpoints/xgboost_best.json")
+    with open("checkpoints/xgboost_best_meta.json", "w") as f:
+        json.dump({"threshold": metrics["threshold"], "test_metrics": metrics}, f, indent=2)
+    print("Saved checkpoint to checkpoints/xgboost_best.json (+ _meta.json)")
 
     return model, metrics
 
