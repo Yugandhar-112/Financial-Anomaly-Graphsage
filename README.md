@@ -7,6 +7,8 @@ Fraud detection on the [Elliptic Bitcoin dataset](https://www.kaggle.com/dataset
 
 > Note: the backend is hosted on Render's free tier and spins down after ~15 minutes of inactivity. The first request after idle time may take 30–60 seconds to wake up — this is expected, not a bug.
 
+![Live demo screenshot](docs/demo_screenshot.jpeg)
+
 ---
 
 ## Problem
@@ -42,6 +44,8 @@ XGBoost — a tree-based model with no access to graph structure at all — hand
 See `results/` for confusion matrices, ROC curves, and PR curves supporting this comparison.
 
 ## Architecture
+
+![Architecture diagram](docs/architecture.svg)
 
 ```
 data/raw/elliptic/          Real Elliptic CSVs (not committed, see setup)
@@ -96,7 +100,7 @@ uvicorn main:app --reload --app-dir api
 ```bash
 cd frontend
 npm install
-cp env.local.example .env.local   # then edit NEXT_PUBLIC_API_URL if needed
+cp .env.local.example .env.local   # then edit NEXT_PUBLIC_API_URL if needed
 npm run dev
 ```
 
@@ -107,3 +111,4 @@ PyTorch Geometric · FastAPI · Next.js · react-force-graph-2d · MLflow · XGB
 ## License
 
 MIT
+
